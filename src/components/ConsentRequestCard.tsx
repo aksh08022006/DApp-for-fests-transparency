@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Card,
   CardContent,
@@ -9,32 +9,51 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, User } from "lucide-react";
+import { Calendar, Clock, MapPin, User, Check, X, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface ConsentRequestCardProps {
+  id?: string;
   eventId?: string;
   eventName?: string;
   eventDate?: string;
   eventTime?: string;
   eventLocation?: string;
   clubName?: string;
+  organizer?: string;
+  requestDate?: string;
   status?: "pending" | "approved" | "rejected";
-  onApprove?: (eventId: string) => void;
-  onReject?: (eventId: string) => void;
+  onApprove?: (requestId: string) => void;
+  onReject?: (requestId: string) => void;
 }
 
 const ConsentRequestCard: React.FC<ConsentRequestCardProps> = ({
+  id = "req-123",
   eventId = "123",
   eventName = "Annual Tech Fest",
   eventDate = "2023-12-15",
   eventTime = "14:00 - 18:00",
   eventLocation = "Main Auditorium",
   clubName = "Computer Science Club",
+  organizer,
+  requestDate,
   status = "pending",
   onApprove = () => {},
   onReject = () => {},
 }) => {
+  const [currentStatus, setCurrentStatus] = useState(status);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showVerificationDialog, setShowVerificationDialog] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -45,79 +64,199 @@ const ConsentRequestCard: React.FC<ConsentRequestCardProps> = ({
   };
 
   const handleApprove = () => {
-    onApprove(eventId);
+    setShowVerificationDialog(true);
   };
 
   const handleReject = () => {
-    onReject(eventId);
+    setIsLoading(true);
+    // Simulate API call
+    setTimeout(() => {
+      setCurrentStatus("rejected");
+      setIsLoading(false);
+      onReject(id);
+    }, 1000);
+  };
+
+  const handleSendVerification = () => {
+    setIsLoading(true);
+    // Simulate sending verification email
+    setTimeout(() => {
+      setVerificationSent(true);
+      setIsLoading(false);
+    }, 1500);
+  };
+
+  const handleVerificationDialogClose = () => {
+    if (verificationSent) {
+      setCurrentStatus("approved");
+      onApprove(id);
+    }
+    setShowVerificationDialog(false);
+    setVerificationSent(false);
   };
 
   return (
-    <Card className="w-[450px] bg-white shadow-md hover:shadow-lg transition-shadow">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-xl font-bold">{eventName}</CardTitle>
-          <Badge
-            variant={
-              status === "pending"
-                ? "outline"
-                : status === "approved"
-                  ? "default"
-                  : "destructive"
-            }
-            className="capitalize"
-          >
-            {status}
-          </Badge>
-        </div>
-        <CardDescription className="flex items-center gap-1 text-sm">
-          <User size={14} />
-          <span>Organized by {clubName}</span>
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="pb-2">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Calendar size={16} className="text-muted-foreground" />
-            <span className="text-sm">{formatDate(eventDate)}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Clock size={16} className="text-muted-foreground" />
-            <span className="text-sm">{eventTime}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <MapPin size={16} className="text-muted-foreground" />
-            <span className="text-sm">{eventLocation}</span>
-          </div>
-        </div>
-      </CardContent>
-
-      <Separator />
-
-      <CardFooter className="pt-4 flex justify-between">
-        {status === "pending" ? (
-          <>
-            <Button
-              variant="outline"
-              onClick={handleReject}
-              className="w-[48%]"
+    <>
+      <Card className="w-full bg-white shadow-md hover:shadow-lg transition-shadow">
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-start">
+            <CardTitle className="text-xl font-bold">{eventName}</CardTitle>
+            <Badge
+              variant={
+                currentStatus === "pending"
+                  ? "outline"
+                  : currentStatus === "approved"
+                    ? "default"
+                    : "destructive"
+              }
+              className="capitalize"
             >
-              Reject
-            </Button>
-            <Button onClick={handleApprove} className="w-[48%]">
-              Approve
-            </Button>
-          </>
-        ) : (
-          <div className="w-full text-center text-sm text-muted-foreground">
-            {status === "approved"
-              ? "You approved this request"
-              : "You rejected this request"}
+              {currentStatus}
+            </Badge>
           </div>
-        )}
-      </CardFooter>
-    </Card>
+          <CardDescription className="flex items-center gap-1 text-sm">
+            <User size={14} />
+            <span>Organized by {organizer || clubName}</span>
+          </CardDescription>
+          {requestDate && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Request received on {formatDate(requestDate)}
+            </p>
+          )}
+        </CardHeader>
+
+        <CardContent className="pb-2">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Calendar size={16} className="text-muted-foreground" />
+              <span className="text-sm">{formatDate(eventDate)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock size={16} className="text-muted-foreground" />
+              <span className="text-sm">{eventTime}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MapPin size={16} className="text-muted-foreground" />
+              <span className="text-sm">{eventLocation}</span>
+            </div>
+          </div>
+        </CardContent>
+
+        <Separator />
+
+        <CardFooter className="pt-4 flex justify-between">
+          {currentStatus === "pending" ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleReject}
+                disabled={isLoading}
+                className="w-[48%]"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <X className="h-4 w-4 mr-2" />
+                )}
+                Reject
+              </Button>
+              <Button
+                onClick={handleApprove}
+                disabled={isLoading}
+                className="w-[48%]"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Check className="h-4 w-4 mr-2" />
+                )}
+                Approve
+              </Button>
+            </>
+          ) : (
+            <div className="w-full text-center text-sm text-muted-foreground flex items-center justify-center">
+              {currentStatus === "approved" ? (
+                <>
+                  <Check className="h-4 w-4 mr-2 text-green-500" />
+                  You approved this request
+                </>
+              ) : (
+                <>
+                  <X className="h-4 w-4 mr-2 text-red-500" />
+                  You rejected this request
+                </>
+              )}
+            </div>
+          )}
+        </CardFooter>
+      </Card>
+
+      <Dialog
+        open={showVerificationDialog}
+        onOpenChange={handleVerificationDialogClose}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Verify Your Identity</DialogTitle>
+            <DialogDescription>
+              To approve this ticket request, we need to verify your identity
+              through email verification and blockchain signature.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {!verificationSent ? (
+              <div className="space-y-4">
+                <p className="text-sm">
+                  We'll send a verification link to your registered email
+                  address. Once verified, you'll be prompted to sign the
+                  transaction with your MetaMask wallet.
+                </p>
+                <p className="text-sm font-medium">Event: {eventName}</p>
+                <p className="text-sm font-medium">
+                  Date: {formatDate(eventDate)}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4 text-center">
+                <div className="rounded-full bg-green-100 p-3 w-12 h-12 mx-auto flex items-center justify-center">
+                  <Check className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="font-medium text-lg">
+                  Verification Email Sent!
+                </h3>
+                <p className="text-sm">
+                  Please check your email and follow the verification link.
+                  After verification, you'll need to sign the transaction with
+                  your MetaMask wallet.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            {!verificationSent ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleVerificationDialogClose}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleSendVerification} disabled={isLoading}>
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : null}
+                  Send Verification Email
+                </Button>
+              </>
+            ) : (
+              <Button onClick={handleVerificationDialogClose}>Close</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

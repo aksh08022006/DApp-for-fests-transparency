@@ -1,18 +1,31 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Separator } from "./ui/separator";
+import { Alert, AlertDescription } from "./ui/alert";
 import StudentDashboard from "./StudentDashboard";
 import ClubDashboard from "./ClubDashboard";
 import ClubLogin from "./ClubLogin";
-import { Bell, LogOut, Settings } from "lucide-react";
+import {
+  Bell,
+  LogOut,
+  Settings,
+  AlertCircle,
+  Wallet,
+  Mail,
+  Loader2,
+} from "lucide-react";
 
 interface HomeProps {
   userRole?: "student" | "club" | undefined;
@@ -38,38 +51,85 @@ const Home = ({
   const [userName, setUserName] = useState<string>(initialUserName);
   const [userEmail, setUserEmail] = useState<string>(initialUserEmail);
   const [loginType, setLoginType] = useState<"student" | "club">("student");
+  const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [studentEmail, setStudentEmail] = useState("");
+  const [studentPassword, setStudentPassword] = useState("");
+  const [walletConnecting, setWalletConnecting] = useState(false);
+
+  // Reset error when login type changes
+  useEffect(() => {
+    setLoginError(null);
+  }, [loginType]);
 
   // Mock function to handle login
-  const handleLogin = () => {
-    setIsAuthenticated(true);
-    setUserRole("student");
-    setUserName("John Doe");
-    setUserEmail("john.doe@college.edu");
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setLoginError(null);
+
+    // Simulate API call
+    setTimeout(() => {
+      if (studentEmail && studentPassword) {
+        setIsAuthenticated(true);
+        setUserRole("student");
+        setUserName("John Doe");
+        setUserEmail(studentEmail);
+        setIsLoading(false);
+      } else {
+        setLoginError("Please enter both email and password");
+        setIsLoading(false);
+      }
+    }, 1500);
   };
 
   const handleClubLogin = (credentials: {
     email: string;
     password: string;
   }) => {
-    setIsAuthenticated(true);
-    setUserRole("club");
-    setUserName("Tech Club Admin");
-    setUserEmail(credentials.email);
+    setIsLoading(true);
+    setLoginError(null);
+
+    // Simulate API call
+    setTimeout(() => {
+      setIsAuthenticated(true);
+      setUserRole("club");
+      setUserName("Tech Club Admin");
+      setUserEmail(credentials.email);
+      setIsLoading(false);
+    }, 1500);
   };
 
   const handleMetaMaskLogin = () => {
-    setIsAuthenticated(true);
-    setUserRole(loginType);
-    setUserName(loginType === "student" ? "John Doe" : "Tech Club Admin");
-    setUserEmail(
-      loginType === "student"
-        ? "john.doe@college.edu"
-        : "tech.club@college.edu",
-    );
+    setWalletConnecting(true);
+    setLoginError(null);
+
+    // Simulate MetaMask connection
+    setTimeout(() => {
+      // Check if MetaMask is installed
+      if (typeof window.ethereum !== "undefined") {
+        // Simulate successful connection
+        setIsAuthenticated(true);
+        setUserRole(loginType);
+        setUserName(loginType === "student" ? "John Doe" : "Tech Club Admin");
+        setUserEmail(
+          loginType === "student"
+            ? "john.doe@college.edu"
+            : "tech.club@college.edu",
+        );
+      } else {
+        setLoginError(
+          "MetaMask not detected. Please install MetaMask extension.",
+        );
+      }
+      setWalletConnecting(false);
+    }, 2000);
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
+    setStudentEmail("");
+    setStudentPassword("");
     onLogout();
   };
 
@@ -111,40 +171,129 @@ const Home = ({
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {loginError && (
+                    <Alert variant="destructive" className="mb-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{loginError}</AlertDescription>
+                    </Alert>
+                  )}
+
                   <div className="flex flex-col gap-4">
-                    <Button onClick={handleMetaMaskLogin} className="w-full">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
-                        viewBox="0 0 212 189"
-                        className="mr-2 h-5 w-5"
-                      >
-                        <path
-                          d="M60.75 173.25L88.313 180.563L88.313 171L90.563 168.75H106.313V180.563L132.75 173.25L126.75 160.313L132.75 149.813L112.313 48L88.313 149.813L94.5 160.313L60.75 173.25Z"
-                          fill="#E2761B"
-                          stroke="#E2761B"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      Connect with MetaMask
-                    </Button>
                     <Button
-                      onClick={handleLogin}
-                      variant="outline"
+                      onClick={handleMetaMaskLogin}
                       className="w-full"
+                      disabled={walletConnecting}
                     >
-                      Sign in with College Email
+                      {walletConnecting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 212 189"
+                          className="mr-2 h-5 w-5"
+                        >
+                          <path
+                            d="M60.75 173.25L88.313 180.563L88.313 171L90.563 168.75H106.313V180.563L132.75 173.25L126.75 160.313L132.75 149.813L112.313 48L88.313 149.813L94.5 160.313L60.75 173.25Z"
+                            fill="#E2761B"
+                            stroke="#E2761B"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                      {walletConnecting
+                        ? "Connecting..."
+                        : "Connect with MetaMask"}
                     </Button>
+
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">
+                          Or continue with
+                        </span>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleLogin}>
+                      <div className="grid gap-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="email">Email</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            placeholder="student@college.edu"
+                            value={studentEmail}
+                            onChange={(e) => setStudentEmail(e.target.value)}
+                            disabled={isLoading}
+                            required
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="password">Password</Label>
+                          <Input
+                            id="password"
+                            type="password"
+                            placeholder="••••••••"
+                            value={studentPassword}
+                            onChange={(e) => setStudentPassword(e.target.value)}
+                            disabled={isLoading}
+                            required
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          className="w-full"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Signing in...
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="mr-2 h-4 w-4" />
+                              Sign in with Email
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </form>
                   </div>
                 </CardContent>
+                <CardFooter className="flex flex-col">
+                  <p className="mt-2 text-xs text-center text-muted-foreground">
+                    By signing in, you agree to our{" "}
+                    <a
+                      href="#"
+                      className="underline underline-offset-4 hover:text-primary"
+                    >
+                      Terms of Service
+                    </a>{" "}
+                    and{" "}
+                    <a
+                      href="#"
+                      className="underline underline-offset-4 hover:text-primary"
+                    >
+                      Privacy Policy
+                    </a>
+                    .
+                  </p>
+                </CardFooter>
               </Card>
             </div>
           ) : (
             <ClubLogin
               onLogin={handleClubLogin}
               onMetaMaskLogin={handleMetaMaskLogin}
+              isLoading={isLoading}
+              loginError={loginError}
+              walletConnecting={walletConnecting}
             />
           )}
         </main>
@@ -183,7 +332,13 @@ const Home = ({
 
             <div className="flex items-center gap-2">
               <Avatar>
-                <AvatarImage src={avatarUrl} alt={userName} />
+                <AvatarImage
+                  src={
+                    avatarUrl ||
+                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${userEmail}`
+                  }
+                  alt={userName}
+                />
                 <AvatarFallback>
                   {userName
                     .split(" ")
@@ -221,14 +376,28 @@ const Home = ({
                 <TabsTrigger value="club">Club Management</TabsTrigger>
               )}
             </TabsList>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-muted px-3 py-1 rounded-full text-xs">
+                <Wallet className="h-3 w-3 mr-1" />
+                <span>Wallet Connected</span>
+              </div>
+            </div>
           </div>
 
           <TabsContent value="student" className="space-y-4">
-            <StudentDashboard />
+            <StudentDashboard
+              studentName={userName}
+              studentId={studentId}
+              email={userEmail}
+            />
           </TabsContent>
 
           <TabsContent value="club" className="space-y-4">
-            <ClubDashboard />
+            <ClubDashboard
+              clubName={userName.replace(" Admin", "")}
+              clubId={userEmail.split("@")[0]}
+            />
           </TabsContent>
         </Tabs>
       </main>
@@ -246,5 +415,8 @@ const Home = ({
     </div>
   );
 };
+
+// Generate a random student ID for demo purposes
+const studentId = `S${Math.floor(10000 + Math.random() * 90000)}`;
 
 export default Home;
