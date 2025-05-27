@@ -101,7 +101,7 @@ const EventCard: React.FC<EventCardProps> = ({
       </CardContent>
       <CardFooter className="pt-0">
         <Button variant="outline" size="sm" className="w-full">
-          View Details
+          {hasTicket ? "View Ticket" : "Register"}
         </Button>
       </CardFooter>
     </Card>

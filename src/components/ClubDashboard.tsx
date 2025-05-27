@@ -54,11 +54,16 @@ const ClubDashboard = ({
   clubId = "tech-123",
 }: ClubDashboardProps) => {
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  // Removed selectedStudents state
   const [eventCreationStep, setEventCreationStep] =
     useState<EventCreationStep>("list");
   const [newEvent, setNewEvent] = useState<EventFormData | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Removed QR scanner state from club dashboard
+  const [selectedEventForScanner, setSelectedEventForScanner] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Mock data
   const [events, setEvents] = useState([
@@ -142,71 +147,9 @@ const ClubDashboard = ({
     },
   ];
 
-  const handleStudentSelection = (studentId: string) => {
-    setSelectedStudents((prev) =>
-      prev.includes(studentId)
-        ? prev.filter((id) => id !== studentId)
-        : [...prev, studentId],
-    );
-  };
+  // Removed handleStudentSelection function
 
-  const handleSendConsentRequests = async () => {
-    try {
-      // Import the API module
-      const api = await import("../lib/api");
-      const blockchain = await import("../lib/blockchain");
-
-      // Connect wallet for club admin
-      const walletAddress = await blockchain.connectWallet();
-
-      if (!walletAddress) {
-        alert("Please connect your MetaMask wallet to send consent requests.");
-        return;
-      }
-
-      // Get the selected event (in a real app, this would be the currently selected event)
-      const selectedEvent = events[0]; // Using the first event for demonstration
-
-      // Send consent requests to all selected students
-      const successfulRequests = [];
-      const failedRequests = [];
-
-      for (const studentId of selectedStudents) {
-        const student = students.find((s) => s.id === studentId);
-
-        if (student) {
-          const result = await api.sendConsentRequest(
-            selectedEvent.id,
-            student.id,
-            student.email,
-            selectedEvent.name,
-          );
-
-          if (result.success) {
-            successfulRequests.push(student.name);
-          } else {
-            failedRequests.push(student.name);
-          }
-        }
-      }
-
-      if (successfulRequests.length > 0) {
-        alert(
-          `Consent requests sent to ${successfulRequests.length} students via blockchain and email.`,
-        );
-        setSelectedStudents([]);
-      }
-
-      if (failedRequests.length > 0) {
-        console.error(
-          `Failed to send consent requests to: ${failedRequests.join(", ")}`,
-        );
-      }
-    } catch (error) {
-      console.error("Error sending consent requests:", error);
-      alert("Failed to send consent requests. Please try again.");
-    }
-  };
+  // Removed handleSendConsentRequests function
 
   const handleCreateEventClick = () => {
     setEventCreationStep("create");
@@ -223,30 +166,35 @@ const ClubDashboard = ({
     setIsSubmitting(true);
 
     try {
-      // Check if MetaMask is installed for blockchain integration
-      if (typeof window.ethereum !== "undefined") {
-        // Get the current account
-        const accounts = await window.ethereum.request({
-          method: "eth_accounts",
-        });
+      // Import the API module
+      const api = await import("../lib/api");
 
-        if (accounts.length === 0) {
-          // Request account access if not already connected
-          await window.ethereum.request({ method: "eth_requestAccounts" });
-        }
+      // Create event using the API
+      const result = await api.createEvent({
+        name: newEvent.name,
+        date:
+          newEvent.date?.toISOString().split("T")[0] ||
+          new Date().toISOString().split("T")[0],
+        time: newEvent.time || "10:00 AM",
+        location: newEvent.location || "TBD",
+        description: newEvent.description || "",
+        organizer: clubName,
+        organizerId: clubId,
+        capacity: newEvent.capacity || 100,
+        category: newEvent.category || "general",
+        image: newEvent.image,
+        status: "upcoming",
+      });
 
-        // In a real app, this would create an event on the blockchain
-        // For now, we'll simulate the API call
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        const eventId = `event-${Date.now()}`;
+      if (result.success && result.event) {
+        // Format the event for display
         const publishedEvent = {
-          id: eventId,
-          name: newEvent.name,
-          date: newEvent.date || new Date(),
-          location: newEvent.location,
+          id: result.event.id,
+          name: result.event.name,
+          date: new Date(result.event.date),
+          location: result.event.location,
           attendees: 0,
-          status: "upcoming",
+          status: result.event.status,
         };
 
         setEvents((prev) => [publishedEvent, ...prev]);
@@ -258,32 +206,8 @@ const ClubDashboard = ({
           setNewEvent(null);
         }, 3000);
       } else {
-        // Handle case where MetaMask is not available
-        console.warn(
-          "MetaMask not detected, falling back to centralized approach",
-        );
-
-        // Simulate API call without blockchain
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        const eventId = `event-${Date.now()}`;
-        const publishedEvent = {
-          id: eventId,
-          name: newEvent.name,
-          date: newEvent.date || new Date(),
-          location: newEvent.location,
-          attendees: 0,
-          status: "upcoming",
-        };
-
-        setEvents((prev) => [publishedEvent, ...prev]);
-        setEventCreationStep("success");
-
-        // Reset after showing success message
-        setTimeout(() => {
-          setEventCreationStep("list");
-          setNewEvent(null);
-        }, 3000);
+        console.error("Failed to create event:", result.error);
+        alert("Failed to create event: " + (result.error || "Unknown error"));
       }
     } catch (error) {
       console.error("Error publishing event:", error);
@@ -394,7 +318,7 @@ const ClubDashboard = ({
                       </Badge>
                     </div>
                   </CardContent>
-                  <CardFooter>
+                  <CardFooter className="flex gap-2">
                     <Button variant="outline" className="w-full">
                       Manage Event
                     </Button>
@@ -421,7 +345,6 @@ const ClubDashboard = ({
       <Tabs defaultValue="events" className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="events">Events</TabsTrigger>
-          <TabsTrigger value="tickets">Ticket Requests</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
         </TabsList>
 
@@ -430,101 +353,7 @@ const ClubDashboard = ({
           {renderEventContent()}
         </TabsContent>
 
-        {/* Ticket Requests Tab */}
-        <TabsContent value="tickets" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Request Ticket Signings</h2>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Search students"
-                className="max-w-xs"
-                icon={<SearchIcon className="h-4 w-4" />}
-              />
-              <Button
-                disabled={selectedStudents.length === 0}
-                onClick={handleSendConsentRequests}
-              >
-                Send Consent Requests
-              </Button>
-            </div>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Select Students</CardTitle>
-              <CardDescription>
-                Choose students to send ticket consent requests for your events
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedStudents.length === students.length}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedStudents(students.map((s) => s.id));
-                          } else {
-                            setSelectedStudents([]);
-                          }
-                        }}
-                      />
-                    </TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {students.map((student) => (
-                    <TableRow key={student.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedStudents.includes(student.id)}
-                          onCheckedChange={() =>
-                            handleStudentSelection(student.id)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage
-                              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${student.id}`}
-                            />
-                            <AvatarFallback>
-                              {student.name.substring(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          {student.name}
-                        </div>
-                      </TableCell>
-                      <TableCell>{student.email}</TableCell>
-                      <TableCell>{student.department}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">Not Requested</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <div className="text-sm text-muted-foreground">
-                {selectedStudents.length} students selected
-              </div>
-              <Button
-                disabled={selectedStudents.length === 0}
-                onClick={handleSendConsentRequests}
-              >
-                Send Consent Requests
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
+        {/* Removed Ticket Requests Tab */}
 
         {/* Attendance Tab */}
         <TabsContent value="attendance" className="space-y-6">
@@ -605,6 +434,7 @@ const ClubDashboard = ({
           </Card>
         </TabsContent>
       </Tabs>
+      {/* Removed QR Scanner Dialog */}
     </div>
   );
 };

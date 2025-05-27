@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import EventRegistration from "./EventRegistration";
+import QRScanner from "./QRScanner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
@@ -76,16 +78,24 @@ interface StudentDashboardProps {
 }
 
 const StudentDashboard: React.FC<StudentDashboardProps> = ({
-  studentName = "John Doe",
-  studentId = "S12345",
-  email = "john.doe@college.edu",
+  studentName,
+  studentId,
+  email,
 }) => {
+  // If props are not provided, try to get from localStorage
+  const actualName =
+    studentName || localStorage.getItem("studentName") || "John Doe";
+  const actualId = studentId || localStorage.getItem("studentId") || "S12345";
+  const actualEmail =
+    email || localStorage.getItem("studentEmail") || "john.doe@college.edu";
   const [activeTab, setActiveTab] = useState("upcoming");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [showTicketDialog, setShowTicketDialog] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [showEventDialog, setShowEventDialog] = useState(false);
+  const [showRegistrationDialog, setShowRegistrationDialog] = useState(false);
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
   const [consentRequestsState, setConsentRequestsState] = useState<
     ConsentRequest[]
   >([]);
@@ -336,9 +346,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
     <div className="bg-background p-6 rounded-lg w-full max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{studentName}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{actualName}</h1>
           <p className="text-muted-foreground">
-            {studentId} | {email}
+            {actualId} | {actualEmail}
           </p>
         </div>
         <div className="mt-4 md:mt-0 flex items-center">
@@ -376,6 +386,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 {pendingConsentRequests.length}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="scan" className="flex items-center">
+            <QrCode className="mr-2 h-4 w-4" />
+            Scan QR
           </TabsTrigger>
         </TabsList>
 
@@ -573,6 +587,26 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="scan" className="space-y-4">
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="bg-muted rounded-lg p-8 max-w-md w-full text-center">
+              <QrCode className="h-16 w-16 mx-auto mb-4 text-primary" />
+              <h2 className="text-xl font-semibold mb-2">Scan Event QR Code</h2>
+              <p className="text-muted-foreground mb-6">
+                Scan a QR code to quickly register for an event or check in at
+                the venue.
+              </p>
+              <Button
+                size="lg"
+                onClick={() => setIsQRScannerOpen(true)}
+                className="w-full"
+              >
+                Open Scanner
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Ticket Dialog */}
@@ -728,13 +762,79 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
                     View My Ticket
                   </Button>
                 ) : (
-                  <Button disabled>Request Ticket</Button>
+                  <Button onClick={() => setShowRegistrationDialog(true)}>
+                    Register for Event
+                  </Button>
                 )}
               </div>
             </>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Event Registration Dialog */}
+      {selectedEvent && (
+        <EventRegistration
+          eventId={selectedEvent.id}
+          eventName={selectedEvent.name}
+          isOpen={showRegistrationDialog}
+          onClose={() => setShowRegistrationDialog(false)}
+          onRegister={async (email) => {
+            try {
+              // In a real implementation, we would call an API to register the student
+              console.log(`Registering ${email} for event ${selectedEvent.id}`);
+
+              // Simulate API call
+              await new Promise((resolve) => setTimeout(resolve, 1500));
+
+              return true;
+            } catch (error) {
+              console.error("Error registering for event:", error);
+              return false;
+            }
+          }}
+        />
+      )}
+
+      {/* QR Scanner Dialog */}
+      <QRScanner
+        isOpen={isQRScannerOpen}
+        onClose={() => setIsQRScannerOpen(false)}
+        onScan={async (data) => {
+          try {
+            console.log("QR code scanned:", data);
+
+            // Parse the QR data (format: event:eventId:timestamp)
+            const parts = data.split(":");
+            if (parts.length >= 2 && parts[0] === "event") {
+              const eventId = parts[1];
+
+              // Find the event
+              const event = upcomingEvents.find((e) => e.id === eventId);
+
+              if (event) {
+                // Show registration dialog for this event
+                setSelectedEvent(event);
+                setShowRegistrationDialog(true);
+              } else {
+                alert("Event not found. Please try scanning again.");
+              }
+            } else {
+              alert(
+                "Invalid QR code format. Please scan a valid event QR code.",
+              );
+            }
+
+            // Close the scanner
+            setIsQRScannerOpen(false);
+          } catch (error) {
+            console.error("Error processing QR code:", error);
+            alert("Failed to process QR code. Please try again.");
+          }
+        }}
+        eventId="any"
+        eventName="Event Registration"
+      />
     </div>
   );
 };

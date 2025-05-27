@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -12,28 +12,74 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Alert, AlertDescription } from "./ui/alert";
 import { AlertCircle, Loader2, Mail } from "lucide-react";
+import { Separator } from "./ui/separator";
 
 interface StudentLoginProps {
   onLogin: (credentials: { email: string; password: string }) => void;
-  onMetaMaskLogin: () => void;
+  onGoogleLogin: (googleData: any) => void;
   isLoading?: boolean;
   loginError?: string | null;
-  walletConnecting?: boolean;
 }
 
 const StudentLogin: React.FC<StudentLoginProps> = ({
   onLogin,
-  onMetaMaskLogin,
+  onGoogleLogin,
   isLoading = false,
   loginError = null,
-  walletConnecting = false,
 }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [googleLoaded, setGoogleLoaded] = useState(false);
+
+  useEffect(() => {
+    // Load Google Sign-In API
+    const loadGoogleSignIn = async () => {
+      try {
+        const auth = await import("../lib/auth");
+        await auth.initGoogleAuth();
+        setGoogleLoaded(true);
+
+        // Initialize Google Sign-In button
+        // @ts-ignore - Google client is loaded dynamically
+        window.google.accounts.id.initialize({
+          client_id: "1234567890-example.apps.googleusercontent.com", // Placeholder
+          callback: handleGoogleResponse,
+          auto_select: false,
+        });
+
+        // Render the button
+        // @ts-ignore - Google client is loaded dynamically
+        window.google.accounts.id.renderButton(
+          document.getElementById("google-signin-student"),
+          {
+            theme: "outline",
+            size: "large",
+            width: "100%",
+            text: "signin_with",
+            shape: "rectangular",
+          },
+        );
+      } catch (error) {
+        console.error("Error loading Google Sign-In:", error);
+      }
+    };
+
+    loadGoogleSignIn();
+
+    return () => {
+      // Cleanup if needed
+    };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onLogin({ email, password });
+  };
+
+  const handleGoogleResponse = (response: any) => {
+    if (response && response.credential) {
+      onGoogleLogin(response);
+    }
   };
 
   return (
@@ -55,32 +101,15 @@ const StudentLogin: React.FC<StudentLoginProps> = ({
         )}
 
         <div className="flex flex-col gap-4">
-          <Button
-            onClick={onMetaMaskLogin}
-            className="w-full"
-            disabled={walletConnecting}
+          {/* Google Sign-In Button */}
+          <div
+            id="google-signin-student"
+            className="w-full flex justify-center"
           >
-            {walletConnecting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 212 189"
-                className="mr-2 h-5 w-5"
-              >
-                <path
-                  d="M60.75 173.25L88.313 180.563L88.313 171L90.563 168.75H106.313V180.563L132.75 173.25L126.75 160.313L132.75 149.813L112.313 48L88.313 149.813L94.5 160.313L60.75 173.25Z"
-                  fill="#E2761B"
-                  stroke="#E2761B"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+            {!googleLoaded && (
+              <div className="h-10 bg-muted animate-pulse rounded-md w-full"></div>
             )}
-            {walletConnecting ? "Connecting..." : "Connect with MetaMask"}
-          </Button>
+          </div>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -88,7 +117,7 @@ const StudentLogin: React.FC<StudentLoginProps> = ({
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
+                Or continue with email
               </span>
             </div>
           </div>

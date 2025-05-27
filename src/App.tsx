@@ -11,6 +11,11 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/student/*" element={<Home userRole="student" />} />
+          <Route path="/club/*" element={<Home userRole="club" />} />
+          {import.meta.env.VITE_TEMPO === "true" && (
+            <Route path="/tempobook/*" />
+          )}
         </Routes>
         {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
       </>

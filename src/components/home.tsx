@@ -17,12 +17,12 @@ import { Alert, AlertDescription } from "./ui/alert";
 import StudentDashboard from "./StudentDashboard";
 import ClubDashboard from "./ClubDashboard";
 import ClubLogin from "./ClubLogin";
+import StudentLogin from "./StudentLogin";
 import {
   Bell,
   LogOut,
   Settings,
   AlertCircle,
-  Wallet,
   Mail,
   Loader2,
 } from "lucide-react";
@@ -37,7 +37,7 @@ interface HomeProps {
 }
 
 const Home = ({
-  userRole: initialUserRole = "student",
+  userRole: initialUserRole,
   userName: initialUserName = "John Doe",
   userEmail: initialUserEmail = "john.doe@college.edu",
   avatarUrl,
@@ -47,7 +47,9 @@ const Home = ({
   const [notifications, setNotifications] = useState<number>(3); // Example notification count
   const [isAuthenticated, setIsAuthenticated] =
     useState<boolean>(initialAuthState); // Start unauthenticated
-  const [userRole, setUserRole] = useState<"student" | "club">(initialUserRole);
+  const [userRole, setUserRole] = useState<"student" | "club">(
+    initialUserRole || "student",
+  );
   const [userName, setUserName] = useState<string>(initialUserName);
   const [userEmail, setUserEmail] = useState<string>(initialUserEmail);
   const [loginType, setLoginType] = useState<"student" | "club">("student");
@@ -62,96 +64,169 @@ const Home = ({
     setLoginError(null);
   }, [loginType]);
 
-  // Mock function to handle login
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setLoginError(null);
-
-    // Simulate API call
-    setTimeout(() => {
-      if (studentEmail && studentPassword) {
-        setIsAuthenticated(true);
-        setUserRole("student");
-        setUserName("John Doe");
-        setUserEmail(studentEmail);
-        setIsLoading(false);
-      } else {
-        setLoginError("Please enter both email and password");
-        setIsLoading(false);
-      }
-    }, 1500);
-  };
-
-  const handleClubLogin = (credentials: {
+  // Handle student login with email/password
+  const handleLogin = async (credentials: {
     email: string;
     password: string;
   }) => {
     setIsLoading(true);
     setLoginError(null);
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsAuthenticated(true);
-      setUserRole("club");
-      setUserName("Tech Club Admin");
-      setUserEmail(credentials.email);
+    try {
+      // Import the API module
+      const api = await import("../lib/api");
+
+      // Call the authentication API
+      const result = await api.authenticateStudent(
+        credentials.email,
+        credentials.password,
+      );
+
+      if (result.success && result.user) {
+        setIsAuthenticated(true);
+        setUserRole("student");
+        setUserName(result.user.name);
+        setUserEmail(result.user.email);
+      } else {
+        setLoginError(result.error || "Authentication failed");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setLoginError(
+        error instanceof Error ? error.message : "An unknown error occurred",
+      );
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
-  const handleMetaMaskLogin = async () => {
-    setWalletConnecting(true);
+  // Handle student login with Google
+  const handleGoogleLogin = async (googleResponse: any) => {
+    setIsLoading(true);
     setLoginError(null);
 
     try {
-      // Check if MetaMask is installed
-      if (typeof window.ethereum !== "undefined") {
-        // Request account access
-        const accounts = await window.ethereum.request({
-          method: "eth_requestAccounts",
-        });
+      // Decode the JWT token to get user info
+      const base64Url = googleResponse.credential.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join(""),
+      );
 
-        if (accounts.length > 0) {
-          // Get the connected account
-          const account = accounts[0];
+      const { email, name, picture } = JSON.parse(jsonPayload);
 
-          // Get the network ID
-          const chainId = await window.ethereum.request({
-            method: "eth_chainId",
-          });
-
-          // Simulate API call to verify wallet and get user info
-          setTimeout(() => {
-            setIsAuthenticated(true);
-            setUserRole(loginType);
-            setUserName(
-              loginType === "student" ? "John Doe" : "Tech Club Admin",
-            );
-            setUserEmail(
-              loginType === "student"
-                ? "john.doe@college.edu"
-                : "tech.club@college.edu",
-            );
-            setWalletConnecting(false);
-          }, 1000);
-        }
-      } else {
-        setLoginError(
-          "MetaMask not detected. Please install MetaMask extension.",
+      // Verify this is a student email (could check domain, etc.)
+      if (email.endsWith("@college.edu") || email.includes("student")) {
+        // Store user info
+        localStorage.setItem("studentName", name);
+        localStorage.setItem(
+          "studentId",
+          `S${Math.floor(10000 + Math.random() * 90000)}`,
         );
-        setWalletConnecting(false);
+        localStorage.setItem("studentEmail", email);
+
+        setIsAuthenticated(true);
+        setUserRole("student");
+        setUserName(name);
+        setUserEmail(email);
+      } else {
+        setLoginError("This Google account is not registered as a student");
       }
     } catch (error) {
-      console.error("Error connecting to MetaMask:", error);
+      console.error("Google login error:", error);
       setLoginError(
         error instanceof Error
           ? error.message
-          : "Failed to connect to MetaMask",
+          : "An unknown error occurred with Google login",
       );
-      setWalletConnecting(false);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  // Handle club admin login with email/password
+  const handleClubLogin = async (credentials: {
+    email: string;
+    password: string;
+  }) => {
+    setIsLoading(true);
+    setLoginError(null);
+
+    try {
+      // Import the API module
+      const api = await import("../lib/api");
+
+      // Call the authentication API
+      const result = await api.authenticateClubAdmin(
+        credentials.email,
+        credentials.password,
+      );
+
+      if (result.success && result.user) {
+        setIsAuthenticated(true);
+        setUserRole("club");
+        setUserName(result.user.name);
+        setUserEmail(result.user.email);
+      } else {
+        setLoginError(result.error || "Authentication failed");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setLoginError(
+        error instanceof Error ? error.message : "An unknown error occurred",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle club admin login with Google
+  const handleGoogleClubLogin = async (googleResponse: any) => {
+    setIsLoading(true);
+    setLoginError(null);
+
+    try {
+      // Decode the JWT token to get user info
+      const base64Url = googleResponse.credential.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join(""),
+      );
+
+      const { email, name, picture } = JSON.parse(jsonPayload);
+
+      // Verify this is a club admin email (could check domain, etc.)
+      if (
+        email.endsWith("@college.edu") ||
+        email.includes("club") ||
+        email.includes("admin")
+      ) {
+        setIsAuthenticated(true);
+        setUserRole("club");
+        setUserName(name);
+        setUserEmail(email);
+      } else {
+        setLoginError("This Google account is not registered as a club admin");
+      }
+    } catch (error) {
+      console.error("Google login error:", error);
+      setLoginError(
+        error instanceof Error
+          ? error.message
+          : "An unknown error occurred with Google login",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Removed MetaMask login function as it's no longer needed for login
 
   const handleLogout = () => {
     setIsAuthenticated(false);
@@ -188,139 +263,19 @@ const Home = ({
         <main className="container py-12 px-4">
           {loginType === "student" ? (
             <div className="flex min-h-[70vh] items-center justify-center">
-              <Card className="w-full max-w-md">
-                <CardHeader>
-                  <CardTitle className="text-2xl font-bold text-center">
-                    Student Login
-                  </CardTitle>
-                  <CardDescription className="text-center">
-                    Sign in to access the student ticketing platform
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loginError && (
-                    <Alert variant="destructive" className="mb-4">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{loginError}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="flex flex-col gap-4">
-                    <Button
-                      onClick={handleMetaMaskLogin}
-                      className="w-full"
-                      disabled={walletConnecting}
-                    >
-                      {walletConnecting ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 212 189"
-                          className="mr-2 h-5 w-5"
-                        >
-                          <path
-                            d="M60.75 173.25L88.313 180.563L88.313 171L90.563 168.75H106.313V180.563L132.75 173.25L126.75 160.313L132.75 149.813L112.313 48L88.313 149.813L94.5 160.313L60.75 173.25Z"
-                            fill="#E2761B"
-                            stroke="#E2761B"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      )}
-                      {walletConnecting
-                        ? "Connecting..."
-                        : "Connect with MetaMask"}
-                    </Button>
-
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">
-                          Or continue with
-                        </span>
-                      </div>
-                    </div>
-
-                    <form onSubmit={handleLogin}>
-                      <div className="grid gap-4">
-                        <div className="grid gap-2">
-                          <Label htmlFor="email">Email</Label>
-                          <Input
-                            id="email"
-                            type="email"
-                            placeholder="student@college.edu"
-                            value={studentEmail}
-                            onChange={(e) => setStudentEmail(e.target.value)}
-                            disabled={isLoading}
-                            required
-                          />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="password">Password</Label>
-                          <Input
-                            id="password"
-                            type="password"
-                            placeholder="••••••••"
-                            value={studentPassword}
-                            onChange={(e) => setStudentPassword(e.target.value)}
-                            disabled={isLoading}
-                            required
-                          />
-                        </div>
-                        <Button
-                          type="submit"
-                          className="w-full"
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Signing in...
-                            </>
-                          ) : (
-                            <>
-                              <Mail className="mr-2 h-4 w-4" />
-                              Sign in with Email
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </form>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex flex-col">
-                  <p className="mt-2 text-xs text-center text-muted-foreground">
-                    By signing in, you agree to our{" "}
-                    <a
-                      href="#"
-                      className="underline underline-offset-4 hover:text-primary"
-                    >
-                      Terms of Service
-                    </a>{" "}
-                    and{" "}
-                    <a
-                      href="#"
-                      className="underline underline-offset-4 hover:text-primary"
-                    >
-                      Privacy Policy
-                    </a>
-                    .
-                  </p>
-                </CardFooter>
-              </Card>
+              <StudentLogin
+                onLogin={handleLogin}
+                onGoogleLogin={handleGoogleLogin}
+                isLoading={isLoading}
+                loginError={loginError}
+              />
             </div>
           ) : (
             <ClubLogin
               onLogin={handleClubLogin}
-              onMetaMaskLogin={handleMetaMaskLogin}
+              onGoogleLogin={handleGoogleClubLogin}
               isLoading={isLoading}
               loginError={loginError}
-              walletConnecting={walletConnecting}
             />
           )}
         </main>
@@ -405,10 +360,7 @@ const Home = ({
             </TabsList>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center bg-muted px-3 py-1 rounded-full text-xs">
-                <Wallet className="h-3 w-3 mr-1" />
-                <span>Wallet Connected</span>
-              </div>
+              {/* Removed wallet connected indicator */}
             </div>
           </div>
 

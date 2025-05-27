@@ -1,12 +1,12 @@
-import jwt from "jsonwebtoken";
 import CryptoJS from "crypto-js";
+import { jwtDecode } from "jwt-decode";
 
-// Secret key for JWT signing - in production, use environment variables
-const JWT_SECRET =
-  process.env.JWT_SECRET || "your-secret-key-change-in-production";
+// Note: This is a client-side implementation
+// In a production app, token generation and verification should happen server-side
 
-// Token expiration time (24 hours in seconds)
-const TOKEN_EXPIRATION = 60 * 60 * 24;
+// Mock token generation for demo purposes only
+// In a real app, this would be done on the server
+const MOCK_SECRET = "demo-secret-not-for-production";
 
 /**
  * Generate a verification token for email verification
@@ -20,26 +20,44 @@ export function generateVerificationToken(
   requestId: string,
   eventId: string,
 ): string {
-  return jwt.sign(
-    {
+  // This is a simplified mock implementation for demo purposes
+  // In a real app, token generation would happen on the server
+  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload = btoa(
+    JSON.stringify({
       email,
       requestId,
       eventId,
       purpose: "email-verification",
-    },
-    JWT_SECRET,
-    { expiresIn: TOKEN_EXPIRATION },
+      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24, // 24 hours
+    }),
   );
+  const signature = btoa(
+    CryptoJS.HmacSHA256(`${header}.${payload}`, MOCK_SECRET).toString(),
+  );
+
+  return `${header}.${payload}.${signature}`;
 }
 
 /**
- * Verify a token and return the decoded data
- * @param token JWT token to verify
+ * Decode a token and return the data
+ * @param token JWT token to decode
  * @returns Decoded token data or null if invalid
  */
 export function verifyToken(token: string): any | null {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    // In a real app, verification would happen on the server
+    // This is just decoding the token without verifying the signature
+    const decoded = jwtDecode(token);
+
+    // Check if token is expired
+    const currentTime = Math.floor(Date.now() / 1000);
+    if (decoded.exp && decoded.exp < currentTime) {
+      console.error("Token expired");
+      return null;
+    }
+
+    return decoded;
   } catch (error) {
     console.error("Token verification failed:", error);
     return null;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -9,27 +9,75 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { MetaMaskIcon } from "./ui/icons";
+import { Alert, AlertDescription } from "./ui/alert";
+import { AlertCircle, Loader2, Mail } from "lucide-react";
 
 interface ClubLoginProps {
   onLogin: (credentials: { email: string; password: string }) => void;
-  onMetaMaskLogin: () => void;
+  onGoogleLogin: (googleData: any) => void;
+  isLoading?: boolean;
+  loginError?: string | null;
 }
 
-const ClubLogin: React.FC<ClubLoginProps> = ({ onLogin, onMetaMaskLogin }) => {
+const ClubLogin: React.FC<ClubLoginProps> = ({
+  onLogin,
+  onGoogleLogin,
+  isLoading = false,
+  loginError = null,
+}) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [googleLoaded, setGoogleLoaded] = useState(false);
+
+  useEffect(() => {
+    // Load Google Sign-In API
+    const loadGoogleSignIn = async () => {
+      try {
+        const auth = await import("../lib/auth");
+        await auth.initGoogleAuth();
+        setGoogleLoaded(true);
+
+        // Initialize Google Sign-In button
+        // @ts-ignore - Google client is loaded dynamically
+        window.google.accounts.id.initialize({
+          client_id: "1234567890-example.apps.googleusercontent.com", // Placeholder
+          callback: handleGoogleResponse,
+          auto_select: false,
+        });
+
+        // Render the button
+        // @ts-ignore - Google client is loaded dynamically
+        window.google.accounts.id.renderButton(
+          document.getElementById("google-signin-club"),
+          {
+            theme: "outline",
+            size: "large",
+            width: "100%",
+            text: "signin_with",
+            shape: "rectangular",
+          },
+        );
+      } catch (error) {
+        console.error("Error loading Google Sign-In:", error);
+      }
+    };
+
+    loadGoogleSignIn();
+
+    return () => {
+      // Cleanup if needed
+    };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    onLogin({ email, password });
+  };
 
-    // Simulate API call
-    setTimeout(() => {
-      onLogin({ email, password });
-      setIsLoading(false);
-    }, 1000);
+  const handleGoogleResponse = (response: any) => {
+    if (response && response.credential) {
+      onGoogleLogin(response);
+    }
   };
 
   return (
@@ -44,67 +92,72 @@ const ClubLogin: React.FC<ClubLoginProps> = ({ onLogin, onMetaMaskLogin }) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="club.admin@college.edu"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
+          {loginError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{loginError}</AlertDescription>
+            </Alert>
+          )}
 
-          <div className="mt-4 relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+          <div className="flex flex-col gap-4">
+            {/* Google Sign-In Button */}
+            <div id="google-signin-club" className="w-full flex justify-center">
+              {!googleLoaded && (
+                <div className="h-10 bg-muted animate-pulse rounded-md w-full"></div>
+              )}
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
-              </span>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with email
+                </span>
+              </div>
             </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="club.admin@college.edu"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="mr-2 h-4 w-4" />
+                    Sign in with Email
+                  </>
+                )}
+              </Button>
+            </form>
           </div>
-
-          <Button
-            onClick={onMetaMaskLogin}
-            variant="outline"
-            className="w-full mt-4 flex items-center justify-center"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 212 189"
-              className="mr-2 h-5 w-5"
-            >
-              <path
-                d="M60.75 173.25L88.313 180.563L88.313 171L90.563 168.75H106.313V180.563L132.75 173.25L126.75 160.313L132.75 149.813L112.313 48L88.313 149.813L94.5 160.313L60.75 173.25Z"
-                fill="#E2761B"
-                stroke="#E2761B"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Connect with MetaMask
-          </Button>
         </CardContent>
       </Card>
     </div>

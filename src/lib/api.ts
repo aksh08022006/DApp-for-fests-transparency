@@ -1,7 +1,110 @@
 import { generateVerificationToken, generateVerificationUrl } from "./token";
-import { sendVerificationEmail, sendTicketConfirmationEmail } from "./email";
+import {
+  sendVerificationEmail,
+  sendTicketConfirmationEmail,
+} from "./emailService";
 import * as db from "./database";
 import * as blockchain from "./blockchain";
+
+/**
+ * Authenticate a club admin
+ * @param email Club admin email
+ * @param password Club admin password
+ * @returns Authentication result
+ */
+export async function authenticateClubAdmin(
+  email: string,
+  password: string,
+): Promise<{ success: boolean; user?: any; error?: string }> {
+  try {
+    // Get the club admin by email
+    const user = await db.getUserByEmail(email);
+
+    if (!user) {
+      return { success: false, error: "Invalid email or password" };
+    }
+
+    if (user.role !== "club") {
+      return { success: false, error: "Invalid account type" };
+    }
+
+    // In a real app, we would verify the password hash here
+    // For now, we'll just simulate a successful login
+
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    };
+  } catch (error) {
+    console.error("Error authenticating club admin:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+/**
+ * Authenticate a student
+ * @param email Student email
+ * @param password Student password
+ * @returns Authentication result
+ */
+export async function authenticateStudent(
+  email: string,
+  password: string,
+): Promise<{ success: boolean; user?: any; error?: string }> {
+  // Store user info in localStorage for persistence
+  const storeUserInfo = (user: any) => {
+    if (user) {
+      localStorage.setItem("studentName", user.name || "");
+      localStorage.setItem("studentId", user.id || "");
+      localStorage.setItem("studentEmail", user.email || "");
+    }
+  };
+  try {
+    // Get the student by email
+    const user = await db.getUserByEmail(email);
+
+    if (!user) {
+      return { success: false, error: "Invalid email or password" };
+    }
+
+    if (user.role !== "student") {
+      return { success: false, error: "Invalid account type" };
+    }
+
+    // In a real app, we would verify the password hash here
+    // For now, we'll just simulate a successful login
+
+    const userData = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      department: user.department,
+    };
+
+    // Store user info in localStorage
+    storeUserInfo(userData);
+
+    return {
+      success: true,
+      user: userData,
+    };
+  } catch (error) {
+    console.error("Error authenticating student:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
 
 /**
  * Send a consent request to a student
@@ -66,8 +169,9 @@ export async function verifyEmail(
   token: string,
 ): Promise<{ success: boolean; requestId?: string; error?: string }> {
   try {
-    // Verify the token
-    const decoded = await import("./token").then((m) => m.verifyToken(token));
+    // Import and use the token module
+    const tokenModule = await import("./token");
+    const decoded = tokenModule.verifyToken(token);
 
     if (!decoded || decoded.purpose !== "email-verification") {
       throw new Error("Invalid or expired verification token");
@@ -232,6 +336,43 @@ export async function getStudentConsentRequests(studentId: string) {
  * @param studentId ID of the student
  * @returns List of tickets with event details
  */
+/**
+ * Create a new event
+ * @param eventData Event data to create
+ * @returns Result with created event
+ */
+export async function createEvent(eventData: {
+  name: string;
+  date: string;
+  time: string;
+  location: string;
+  description: string;
+  organizer: string;
+  organizerId: string;
+  capacity: number;
+  category: string;
+  image?: string;
+  status: "upcoming" | "past" | "cancelled";
+}): Promise<{ success: boolean; event?: any; error?: string }> {
+  try {
+    // Validate required fields
+    if (!eventData.name || !eventData.date || !eventData.organizer) {
+      return { success: false, error: "Missing required event information" };
+    }
+
+    // Create the event in the database
+    const newEvent = await db.createEvent(eventData);
+
+    return { success: true, event: newEvent };
+  } catch (error) {
+    console.error("Error creating event:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
 export async function getStudentTickets(studentId: string) {
   try {
     const tickets = await db.getTicketsByStudentId(studentId);
