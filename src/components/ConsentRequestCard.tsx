@@ -77,19 +77,68 @@ const ConsentRequestCard: React.FC<ConsentRequestCardProps> = ({
     }, 1000);
   };
 
-  const handleSendVerification = () => {
+  const handleSendVerification = async () => {
     setIsLoading(true);
-    // Simulate sending verification email
-    setTimeout(() => {
-      setVerificationSent(true);
+    try {
+      // Import the API module and send verification email
+      const api = await import("../lib/api");
+      const student = { id: "student1", email: "john.doe@college.edu" }; // In a real app, this would come from context/props
+
+      const result = await api.sendConsentRequest(
+        eventId,
+        student.id,
+        student.email,
+        eventName,
+      );
+
+      if (result.success) {
+        setVerificationSent(true);
+      } else {
+        throw new Error(result.error || "Failed to send verification email");
+      }
+    } catch (error) {
+      console.error("Verification error:", error);
+      // Handle error appropriately
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
-  const handleVerificationDialogClose = () => {
+  const handleVerificationDialogClose = async () => {
     if (verificationSent) {
-      setCurrentStatus("approved");
-      onApprove(id);
+      try {
+        // In a real app, this would be where the user signs the transaction with MetaMask
+        if (typeof window.ethereum !== "undefined") {
+          // Request account access if needed
+          const accounts = await window.ethereum.request({
+            method: "eth_accounts",
+          });
+
+          if (accounts.length === 0) {
+            await window.ethereum.request({ method: "eth_requestAccounts" });
+          }
+
+          // Simulate signing a message (in a real app, this would be a transaction or message signing)
+          const message = `I approve the ticket request for ${eventName} on ${eventDate}`;
+          const from = accounts[0];
+
+          // This would be an actual signature in a production app
+          // const signature = await window.ethereum.request({
+          //   method: 'personal_sign',
+          //   params: [message, from],
+          // });
+
+          // For demo purposes, we'll just simulate a successful signature
+          console.log(`Message would be signed by ${from}: ${message}`);
+
+          // Update status and call the approve function
+          setCurrentStatus("approved");
+          onApprove(id);
+        }
+      } catch (error) {
+        console.error("Error during blockchain signature:", error);
+        // Handle error appropriately
+      }
     }
     setShowVerificationDialog(false);
     setVerificationSent(false);

@@ -218,7 +218,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
     }
   }, []);
 
-  const handleApproveConsent = (requestId: string) => {
+  const handleApproveConsent = async (requestId: string) => {
     console.log(`Approved consent request: ${requestId}`);
     // Update the status of the approved request
     setConsentRequestsState((prev) =>
@@ -231,22 +231,55 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
     const approvedRequest = consentRequestsState.find(
       (req) => req.id === requestId,
     );
-    if (approvedRequest) {
-      const newTicket: Ticket = {
-        id: `t-${Date.now()}`,
-        eventId: approvedRequest.eventId,
-        eventName: approvedRequest.eventName,
-        date: approvedRequest.date,
-        time: approvedRequest.time,
-        location: approvedRequest.location,
-        organizer: approvedRequest.organizer,
-        status: "active",
-        qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ticket-${Date.now()}`,
-        transactionHash: `0x${Math.random().toString(16).substring(2, 15)}`,
-      };
 
-      // In a real app, you would add this ticket to your state or database
-      console.log("New ticket created:", newTicket);
+    if (approvedRequest) {
+      try {
+        // Import the blockchain and API modules
+        const blockchain = await import("../lib/blockchain");
+        const api = await import("../lib/api");
+
+        // Connect wallet if not already connected
+        const walletAddress = await blockchain.connectWallet();
+
+        if (walletAddress) {
+          // Complete blockchain verification and issue ticket
+          const result = await api.completeBlockchainVerification(
+            requestId,
+            walletAddress,
+          );
+
+          if (result.success && result.ticketId && result.transactionHash) {
+            const newTicket: Ticket = {
+              id: result.ticketId,
+              eventId: approvedRequest.eventId,
+              eventName: approvedRequest.eventName,
+              date: approvedRequest.date,
+              time: approvedRequest.time,
+              location: approvedRequest.location,
+              organizer: approvedRequest.organizer,
+              status: "active",
+              qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${result.ticketId}`,
+              transactionHash: result.transactionHash,
+            };
+
+            console.log(
+              "New ticket created with blockchain transaction:",
+              newTicket,
+            );
+          } else {
+            console.error(
+              "Failed to complete blockchain verification:",
+              result.error,
+            );
+          }
+        } else {
+          console.error("Failed to connect wallet");
+          // Handle the case where wallet connection fails
+        }
+      } catch (error) {
+        console.error("Error during ticket creation:", error);
+        // Handle the error appropriately
+      }
     }
   };
 
@@ -260,9 +293,27 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
     );
   };
 
-  const handleViewTicket = (ticket: Ticket) => {
+  const handleViewTicket = async (ticket: Ticket) => {
     setSelectedTicket(ticket);
     setShowTicketDialog(true);
+
+    // In a real app, we would verify the ticket on the blockchain here
+    try {
+      if (typeof window.ethereum !== "undefined") {
+        // Get the current account
+        const accounts = await window.ethereum.request({
+          method: "eth_accounts",
+        });
+
+        if (accounts.length > 0) {
+          // Simulate verifying the ticket on the blockchain
+          console.log(`Verifying ticket ${ticket.id} for ${accounts[0]}`);
+          // This would be an actual smart contract call in a real app
+        }
+      }
+    } catch (error) {
+      console.error("Error verifying ticket on blockchain:", error);
+    }
   };
 
   const handleViewEvent = (event: Event) => {

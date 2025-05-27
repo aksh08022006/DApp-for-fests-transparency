@@ -100,30 +100,57 @@ const Home = ({
     }, 1500);
   };
 
-  const handleMetaMaskLogin = () => {
+  const handleMetaMaskLogin = async () => {
     setWalletConnecting(true);
     setLoginError(null);
 
-    // Simulate MetaMask connection
-    setTimeout(() => {
+    try {
       // Check if MetaMask is installed
       if (typeof window.ethereum !== "undefined") {
-        // Simulate successful connection
-        setIsAuthenticated(true);
-        setUserRole(loginType);
-        setUserName(loginType === "student" ? "John Doe" : "Tech Club Admin");
-        setUserEmail(
-          loginType === "student"
-            ? "john.doe@college.edu"
-            : "tech.club@college.edu",
-        );
+        // Request account access
+        const accounts = await window.ethereum.request({
+          method: "eth_requestAccounts",
+        });
+
+        if (accounts.length > 0) {
+          // Get the connected account
+          const account = accounts[0];
+
+          // Get the network ID
+          const chainId = await window.ethereum.request({
+            method: "eth_chainId",
+          });
+
+          // Simulate API call to verify wallet and get user info
+          setTimeout(() => {
+            setIsAuthenticated(true);
+            setUserRole(loginType);
+            setUserName(
+              loginType === "student" ? "John Doe" : "Tech Club Admin",
+            );
+            setUserEmail(
+              loginType === "student"
+                ? "john.doe@college.edu"
+                : "tech.club@college.edu",
+            );
+            setWalletConnecting(false);
+          }, 1000);
+        }
       } else {
         setLoginError(
           "MetaMask not detected. Please install MetaMask extension.",
         );
+        setWalletConnecting(false);
       }
+    } catch (error) {
+      console.error("Error connecting to MetaMask:", error);
+      setLoginError(
+        error instanceof Error
+          ? error.message
+          : "Failed to connect to MetaMask",
+      );
       setWalletConnecting(false);
-    }, 2000);
+    }
   };
 
   const handleLogout = () => {

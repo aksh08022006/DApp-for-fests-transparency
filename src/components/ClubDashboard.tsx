@@ -150,10 +150,62 @@ const ClubDashboard = ({
     );
   };
 
-  const handleSendConsentRequests = () => {
-    // This would connect to the backend to send consent requests
-    alert(`Consent requests sent to ${selectedStudents.length} students`);
-    setSelectedStudents([]);
+  const handleSendConsentRequests = async () => {
+    try {
+      // Import the API module
+      const api = await import("../lib/api");
+      const blockchain = await import("../lib/blockchain");
+
+      // Connect wallet for club admin
+      const walletAddress = await blockchain.connectWallet();
+
+      if (!walletAddress) {
+        alert("Please connect your MetaMask wallet to send consent requests.");
+        return;
+      }
+
+      // Get the selected event (in a real app, this would be the currently selected event)
+      const selectedEvent = events[0]; // Using the first event for demonstration
+
+      // Send consent requests to all selected students
+      const successfulRequests = [];
+      const failedRequests = [];
+
+      for (const studentId of selectedStudents) {
+        const student = students.find((s) => s.id === studentId);
+
+        if (student) {
+          const result = await api.sendConsentRequest(
+            selectedEvent.id,
+            student.id,
+            student.email,
+            selectedEvent.name,
+          );
+
+          if (result.success) {
+            successfulRequests.push(student.name);
+          } else {
+            failedRequests.push(student.name);
+          }
+        }
+      }
+
+      if (successfulRequests.length > 0) {
+        alert(
+          `Consent requests sent to ${successfulRequests.length} students via blockchain and email.`,
+        );
+        setSelectedStudents([]);
+      }
+
+      if (failedRequests.length > 0) {
+        console.error(
+          `Failed to send consent requests to: ${failedRequests.join(", ")}`,
+        );
+      }
+    } catch (error) {
+      console.error("Error sending consent requests:", error);
+      alert("Failed to send consent requests. Please try again.");
+    }
   };
 
   const handleCreateEventClick = () => {
@@ -165,33 +217,80 @@ const ClubDashboard = ({
     setEventCreationStep("preview");
   };
 
-  const handleEventPublish = () => {
+  const handleEventPublish = async () => {
     if (!newEvent) return;
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      const eventId = `event-${Date.now()}`;
-      const publishedEvent = {
-        id: eventId,
-        name: newEvent.name,
-        date: newEvent.date || new Date(),
-        location: newEvent.location,
-        attendees: 0,
-        status: "upcoming",
-      };
+    try {
+      // Check if MetaMask is installed for blockchain integration
+      if (typeof window.ethereum !== "undefined") {
+        // Get the current account
+        const accounts = await window.ethereum.request({
+          method: "eth_accounts",
+        });
 
-      setEvents((prev) => [publishedEvent, ...prev]);
+        if (accounts.length === 0) {
+          // Request account access if not already connected
+          await window.ethereum.request({ method: "eth_requestAccounts" });
+        }
+
+        // In a real app, this would create an event on the blockchain
+        // For now, we'll simulate the API call
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        const eventId = `event-${Date.now()}`;
+        const publishedEvent = {
+          id: eventId,
+          name: newEvent.name,
+          date: newEvent.date || new Date(),
+          location: newEvent.location,
+          attendees: 0,
+          status: "upcoming",
+        };
+
+        setEvents((prev) => [publishedEvent, ...prev]);
+        setEventCreationStep("success");
+
+        // Reset after showing success message
+        setTimeout(() => {
+          setEventCreationStep("list");
+          setNewEvent(null);
+        }, 3000);
+      } else {
+        // Handle case where MetaMask is not available
+        console.warn(
+          "MetaMask not detected, falling back to centralized approach",
+        );
+
+        // Simulate API call without blockchain
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        const eventId = `event-${Date.now()}`;
+        const publishedEvent = {
+          id: eventId,
+          name: newEvent.name,
+          date: newEvent.date || new Date(),
+          location: newEvent.location,
+          attendees: 0,
+          status: "upcoming",
+        };
+
+        setEvents((prev) => [publishedEvent, ...prev]);
+        setEventCreationStep("success");
+
+        // Reset after showing success message
+        setTimeout(() => {
+          setEventCreationStep("list");
+          setNewEvent(null);
+        }, 3000);
+      }
+    } catch (error) {
+      console.error("Error publishing event:", error);
+      // Handle error appropriately
+    } finally {
       setIsSubmitting(false);
-      setEventCreationStep("success");
-
-      // Reset after showing success message
-      setTimeout(() => {
-        setEventCreationStep("list");
-        setNewEvent(null);
-      }, 3000);
-    }, 1500);
+    }
   };
 
   const renderEventContent = () => {
