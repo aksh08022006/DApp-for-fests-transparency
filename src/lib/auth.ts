@@ -36,7 +36,8 @@ export async function signInWithGoogle(): Promise<{
     return new Promise((resolve) => {
       // @ts-ignore - Google client is loaded dynamically
       window.google.accounts.id.initialize({
-        client_id: "1234567890-example.apps.googleusercontent.com", // This is a placeholder, would be replaced with actual client ID
+        client_id:
+          "348859740860-bckqbgtpc6mceqe049q0joqu65a4e6g6.apps.googleusercontent.com",
         callback: async (response: any) => {
           if (response && response.credential) {
             // Decode the JWT token to get user info

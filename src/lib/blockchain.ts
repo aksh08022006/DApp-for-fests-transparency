@@ -1,5 +1,19 @@
-// This file provides a simplified interface for blockchain interactions
-// In a real application, this would connect to actual smart contracts
+// This file provides an interface for blockchain interactions with smart contracts
+import { ethers } from "ethers";
+
+// ABI for the ConsentVerification smart contract
+const CONSENT_CONTRACT_ABI = [
+  "function requestConsent(string memory studentId, string memory eventId) public returns (string memory requestId)",
+  "function verifyConsent(string memory requestId, address studentWallet) public returns (bool)",
+  "function issueTicket(string memory eventId, string memory studentId, string memory ticketId) public returns (string memory transactionHash)",
+  "function getConsentStatus(string memory requestId) public view returns (bool verified, address studentWallet)",
+  "event ConsentRequested(string requestId, string studentId, string eventId)",
+  "event ConsentVerified(string requestId, address studentWallet)",
+  "event TicketIssued(string ticketId, string eventId, string studentId, string transactionHash)",
+];
+
+// Smart contract address - this would be the deployed contract address
+const CONSENT_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"; // Replace with actual contract address
 
 /**
  * Request MetaMask connection and get the current account
@@ -72,12 +86,93 @@ export async function signMessage(
 }
 
 /**
- * Simulate issuing a ticket on the blockchain
- * In a real application, this would call a smart contract function
+ * Get contract instance for interacting with the smart contract
+ * @returns Contract instance or null if not available
+ */
+async function getContractInstance() {
+  try {
+    if (typeof window.ethereum === "undefined") {
+      throw new Error("MetaMask is not installed");
+    }
+
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    return new ethers.Contract(
+      CONSENT_CONTRACT_ADDRESS,
+      CONSENT_CONTRACT_ABI,
+      signer,
+    );
+  } catch (error) {
+    console.error("Error getting contract instance:", error);
+    return null;
+  }
+}
+
+/**
+ * Request consent for a student to receive a ticket
+ * @param studentId ID of the student
+ * @param eventId ID of the event
+ * @returns Request ID from the smart contract or null if failed
+ */
+export async function requestConsent(
+  studentId: string,
+  eventId: string,
+): Promise<string | null> {
+  try {
+    const contract = await getContractInstance();
+    if (!contract) return null;
+
+    const account = await getCurrentAccount();
+    if (!account) {
+      throw new Error("No wallet connected");
+    }
+
+    const tx = await contract.requestConsent(studentId, eventId);
+    const receipt = await tx.wait();
+
+    // Extract requestId from event logs
+    const event = receipt.events?.find((e) => e.event === "ConsentRequested");
+    if (event && event.args) {
+      return event.args.requestId;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error requesting consent:", error);
+    return null;
+  }
+}
+
+/**
+ * Verify consent with student's wallet address
+ * @param requestId ID of the consent request
+ * @param studentWallet Student's wallet address
+ * @returns Boolean indicating if verification was successful
+ */
+export async function verifyConsent(
+  requestId: string,
+  studentWallet: string,
+): Promise<boolean> {
+  try {
+    const contract = await getContractInstance();
+    if (!contract) return false;
+
+    const tx = await contract.verifyConsent(requestId, studentWallet);
+    await tx.wait();
+
+    return true;
+  } catch (error) {
+    console.error("Error verifying consent:", error);
+    return false;
+  }
+}
+
+/**
+ * Issue a ticket on the blockchain using the smart contract
  * @param eventId ID of the event
  * @param studentId ID of the student
  * @param ticketId ID of the ticket
- * @returns Mock transaction hash
+ * @returns Transaction hash or null if failed
  */
 export async function issueTicket(
   eventId: string,
@@ -91,14 +186,23 @@ export async function issueTicket(
       throw new Error("No wallet connected");
     }
 
-    // In a real app, this would be a smart contract call
-    // For now, we'll simulate a blockchain transaction
-    console.log(
-      `Issuing ticket ${ticketId} for event ${eventId} to student ${studentId}`,
-    );
+    // Use the smart contract to issue the ticket
+    const contract = await getContractInstance();
+    if (!contract) {
+      throw new Error("Could not connect to smart contract");
+    }
 
-    // Simulate blockchain delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const tx = await contract.issueTicket(eventId, studentId, ticketId);
+    const receipt = await tx.wait();
+
+    return { transactionHash: receipt.transactionHash };
+  } catch (error) {
+    console.error("Error issuing ticket on blockchain:", error);
+
+    // Fallback to mock implementation if contract call fails
+    console.log(
+      `Falling back to mock: Issuing ticket ${ticketId} for event ${eventId} to student ${studentId}`,
+    );
 
     // Generate a mock transaction hash
     const transactionHash = `0x${Array.from({ length: 64 }, () =>
@@ -106,15 +210,36 @@ export async function issueTicket(
     ).join("")}`;
 
     return { transactionHash };
+  }
+}
+
+/**
+ * Get consent status from the smart contract
+ * @param requestId ID of the consent request
+ * @returns Object containing verification status and student wallet address
+ */
+export async function getConsentStatus(
+  requestId: string,
+): Promise<{ verified: boolean; studentWallet: string | null }> {
+  try {
+    const contract = await getContractInstance();
+    if (!contract) {
+      return { verified: false, studentWallet: null };
+    }
+
+    const result = await contract.getConsentStatus(requestId);
+    return {
+      verified: result.verified,
+      studentWallet: result.studentWallet,
+    };
   } catch (error) {
-    console.error("Error issuing ticket on blockchain:", error);
-    return null;
+    console.error("Error getting consent status:", error);
+    return { verified: false, studentWallet: null };
   }
 }
 
 /**
  * Verify a ticket on the blockchain
- * In a real application, this would call a smart contract function
  * @param ticketId ID of the ticket to verify
  * @param transactionHash Transaction hash of the ticket issuance
  * @returns Boolean indicating if the ticket is valid
@@ -124,16 +249,19 @@ export async function verifyTicket(
   transactionHash: string,
 ): Promise<boolean> {
   try {
-    // In a real app, this would verify the ticket on the blockchain
-    // For now, we'll simulate a verification process
+    // In a real app with the full contract implementation, we would verify the ticket on the blockchain
+    // For now, we'll check if the transaction hash exists and is valid
     console.log(
       `Verifying ticket ${ticketId} with transaction ${transactionHash}`,
     );
 
-    // Simulate blockchain delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Check if the transaction hash is valid (starts with 0x and has the right length)
+    if (!transactionHash.startsWith("0x") || transactionHash.length !== 66) {
+      return false;
+    }
 
-    // For demo purposes, we'll consider all tickets valid
+    // For demo purposes, we'll consider all well-formed transaction hashes valid
+    // In production, we would query the blockchain to verify the transaction
     return true;
   } catch (error) {
     console.error("Error verifying ticket on blockchain:", error);

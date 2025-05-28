@@ -29,34 +29,65 @@ const ClubLogin: React.FC<ClubLoginProps> = ({
   const [password, setPassword] = useState("");
   const [googleLoaded, setGoogleLoaded] = useState(false);
 
+  // Fix for removeChild error
   useEffect(() => {
+    let isMounted = true;
+
+    // Create a ref to store the button container
+    const buttonContainerRef = { current: null as HTMLElement | null };
+
     // Load Google Sign-In API
     const loadGoogleSignIn = async () => {
       try {
         const auth = await import("../lib/auth");
         await auth.initGoogleAuth();
+
+        // Check if component is still mounted before updating state
+        if (!isMounted) return;
+
         setGoogleLoaded(true);
 
         // Initialize Google Sign-In button
-        // @ts-ignore - Google client is loaded dynamically
-        window.google.accounts.id.initialize({
-          client_id: "1234567890-example.apps.googleusercontent.com", // Placeholder
-          callback: handleGoogleResponse,
-          auto_select: false,
-        });
+        if (
+          typeof window !== "undefined" &&
+          window.google &&
+          window.google.accounts
+        ) {
+          // @ts-ignore - Google client is loaded dynamically
+          window.google.accounts.id.initialize({
+            client_id:
+              "348859740860-bckqbgtpc6mceqe049q0joqu65a4e6g6.apps.googleusercontent.com",
+            callback: handleGoogleResponse,
+            auto_select: false,
+          });
 
-        // Render the button
-        // @ts-ignore - Google client is loaded dynamically
-        window.google.accounts.id.renderButton(
-          document.getElementById("google-signin-club"),
-          {
-            theme: "outline",
-            size: "large",
-            width: "100%",
-            text: "signin_with",
-            shape: "rectangular",
-          },
-        );
+          // Wait for next render cycle to ensure DOM is stable
+          setTimeout(() => {
+            if (!isMounted) return;
+
+            // Get a fresh reference to the container
+            const buttonContainer =
+              document.getElementById("google-signin-club");
+            if (!buttonContainer) return;
+
+            // Store the reference
+            buttonContainerRef.current = buttonContainer;
+
+            // Create a new div for the button
+            const buttonElement = document.createElement("div");
+            buttonElement.id = "google-button-club";
+            buttonContainer.appendChild(buttonElement);
+
+            // @ts-ignore - Google client is loaded dynamically
+            window.google.accounts.id.renderButton(buttonElement, {
+              theme: "outline",
+              size: "large",
+              width: "100%",
+              text: "signin_with",
+              shape: "rectangular",
+            });
+          }, 0);
+        }
       } catch (error) {
         console.error("Error loading Google Sign-In:", error);
       }
@@ -65,7 +96,35 @@ const ClubLogin: React.FC<ClubLoginProps> = ({
     loadGoogleSignIn();
 
     return () => {
-      // Cleanup if needed
+      // Mark component as unmounted
+      isMounted = false;
+
+      // Cleanup Google Sign-In when component unmounts
+      try {
+        // First cancel the Google Sign-In
+        if (
+          typeof window !== "undefined" &&
+          window.google &&
+          window.google.accounts &&
+          window.google.accounts.id
+        ) {
+          // @ts-ignore - Google client is loaded dynamically
+          window.google.accounts.id.cancel();
+        }
+
+        // Then safely remove the button element if it exists
+        if (buttonContainerRef.current) {
+          const buttonElement = document.getElementById("google-button-club");
+          if (buttonElement) {
+            // Check if the element is still in the DOM and has a parent
+            if (buttonElement.parentNode) {
+              buttonElement.parentNode.removeChild(buttonElement);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error cleaning up Google Sign-In:", error);
+      }
     };
   }, []);
 
@@ -76,6 +135,7 @@ const ClubLogin: React.FC<ClubLoginProps> = ({
 
   const handleGoogleResponse = (response: any) => {
     if (response && response.credential) {
+      // Process the response and redirect to club dashboard
       onGoogleLogin(response);
     }
   };

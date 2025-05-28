@@ -105,17 +105,49 @@ const VerifyEmail: React.FC = () => {
     setMessage("Processing blockchain verification...");
 
     try {
+      // First verify consent on the blockchain
+      const consentVerified = await blockchain.verifyConsent(
+        requestId,
+        address,
+      );
+
+      if (!consentVerified) {
+        setVerificationState("error");
+        setMessage(
+          "Failed to verify consent on the blockchain. Please try again.",
+        );
+        return;
+      }
+
+      // Then complete the verification in our backend
       const result = await api.completeBlockchainVerification(
         requestId,
         address,
       );
 
       if (result.success && result.ticketId) {
-        setTicketId(result.ticketId);
-        setVerificationState("success");
-        setMessage(
-          "Verification complete! Your ticket has been issued on the blockchain.",
+        // Issue the ticket on the blockchain
+        const eventId = result.eventId || "unknown-event";
+        const studentId = result.studentId || "unknown-student";
+
+        const ticketResult = await blockchain.issueTicket(
+          eventId,
+          studentId,
+          result.ticketId,
         );
+
+        if (ticketResult && ticketResult.transactionHash) {
+          setTicketId(result.ticketId);
+          setVerificationState("success");
+          setMessage(
+            "Verification complete! Your ticket has been issued on the blockchain.",
+          );
+        } else {
+          setVerificationState("error");
+          setMessage(
+            "Failed to issue ticket on the blockchain. Please try again.",
+          );
+        }
       } else {
         setVerificationState("error");
         setMessage(

@@ -99,6 +99,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [consentRequestsState, setConsentRequestsState] = useState<
     ConsentRequest[]
   >([]);
+  const [scannedAttendees, setScannedAttendees] = useState<
+    Array<{ id: string; email: string; timestamp: string }>
+  >([]);
+  const [selectedEventForScanning, setSelectedEventForScanning] =
+    useState<Event | null>(null);
 
   // Mock data for demonstration
   const upcomingEvents: Event[] = [
@@ -592,11 +597,60 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
           <div className="flex flex-col items-center justify-center py-8">
             <div className="bg-muted rounded-lg p-8 max-w-md w-full text-center">
               <QrCode className="h-16 w-16 mx-auto mb-4 text-primary" />
-              <h2 className="text-xl font-semibold mb-2">Scan Event QR Code</h2>
+              <h2 className="text-xl font-semibold mb-2">Scan QR Code</h2>
               <p className="text-muted-foreground mb-6">
                 Scan a QR code to quickly register for an event or check in at
                 the venue.
               </p>
+
+              {selectedEventForScanning ? (
+                <div className="mb-6 text-left bg-blue-50 p-4 rounded-lg">
+                  <h3 className="font-medium text-blue-800 mb-2">
+                    Currently Scanning For:
+                  </h3>
+                  <p className="text-blue-700 mb-1">
+                    {selectedEventForScanning.name}
+                  </p>
+                  <p className="text-sm text-blue-600">
+                    {new Date(
+                      selectedEventForScanning.date,
+                    ).toLocaleDateString()}{" "}
+                    at {selectedEventForScanning.time}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setSelectedEventForScanning(null)}
+                  >
+                    Change Event
+                  </Button>
+                </div>
+              ) : (
+                <div className="mb-6">
+                  <p className="text-amber-600 mb-4">
+                    Select an event to scan attendees for:
+                  </p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {upcomingEvents.map((event) => (
+                      <Button
+                        key={event.id}
+                        variant="outline"
+                        className="w-full justify-start text-left"
+                        onClick={() => setSelectedEventForScanning(event)}
+                      >
+                        <div>
+                          <p className="font-medium">{event.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(event.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <Button
                 size="lg"
                 onClick={() => setIsQRScannerOpen(true)}
@@ -605,6 +659,49 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 Open Scanner
               </Button>
             </div>
+
+            {selectedEventForScanning && scannedAttendees.length > 0 && (
+              <div className="mt-8 bg-white p-6 rounded-lg shadow-md w-full max-w-md">
+                <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
+                  <span>Scanned Attendees</span>
+                  <Badge>{scannedAttendees.length}</Badge>
+                </h3>
+
+                <div className="overflow-y-auto max-h-60">
+                  <table className="w-full">
+                    <thead className="border-b">
+                      <tr>
+                        <th className="text-left py-2">ID</th>
+                        <th className="text-left py-2">Email</th>
+                        <th className="text-left py-2">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scannedAttendees.map((attendee, index) => (
+                        <tr key={index} className="border-b border-gray-100">
+                          <td className="py-2">{attendee.id}</td>
+                          <td className="py-2">{attendee.email}</td>
+                          <td className="py-2 text-xs text-muted-foreground">
+                            {new Date(attendee.timestamp).toLocaleTimeString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4 flex justify-between">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setScannedAttendees([])}
+                  >
+                    Clear List
+                  </Button>
+                  <Button size="sm">Export CSV</Button>
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
@@ -800,40 +897,87 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
       <QRScanner
         isOpen={isQRScannerOpen}
         onClose={() => setIsQRScannerOpen(false)}
-        onScan={async (data) => {
+        onScan={async (data, studentEmail) => {
           try {
             console.log("QR code scanned:", data);
 
-            // Parse the QR data (format: event:eventId:timestamp)
-            const parts = data.split(":");
-            if (parts.length >= 2 && parts[0] === "event") {
-              const eventId = parts[1];
+            if (!selectedEventForScanning) {
+              // Parse the QR data (format: event:eventId:timestamp)
+              const parts = data.split(":");
+              if (parts.length >= 2 && parts[0] === "event") {
+                const eventId = parts[1];
 
-              // Find the event
-              const event = upcomingEvents.find((e) => e.id === eventId);
+                // Find the event
+                const event = upcomingEvents.find((e) => e.id === eventId);
 
-              if (event) {
-                // Show registration dialog for this event
-                setSelectedEvent(event);
-                setShowRegistrationDialog(true);
+                if (event) {
+                  // Show registration dialog for this event
+                  setSelectedEvent(event);
+                  setShowRegistrationDialog(true);
+                } else {
+                  alert("Event not found. Please try scanning again.");
+                }
+              } else if (parts.length >= 3 && parts[0] === "student") {
+                // Student QR code scanned but no event selected
+                alert(
+                  "Please select an event before scanning student QR codes.",
+                );
               } else {
-                alert("Event not found. Please try scanning again.");
+                alert("Invalid QR code format. Please scan a valid QR code.");
               }
             } else {
-              alert(
-                "Invalid QR code format. Please scan a valid event QR code.",
-              );
-            }
+              // We're scanning for a specific event
+              // Parse the QR data (format: student:studentId:studentEmail:timestamp)
+              const parts = data.split(":");
+              if (parts.length >= 3 && parts[0] === "student") {
+                const studentId = parts[1];
+                const email = parts[2] || studentEmail || "";
+                const timestamp = new Date().toISOString();
 
-            // Close the scanner
-            setIsQRScannerOpen(false);
+                // Add to scanned attendees
+                setScannedAttendees((prev) => [
+                  ...prev,
+                  { id: studentId, email, timestamp },
+                ]);
+
+                // Send verification email
+                try {
+                  // Import the API module
+                  const api = await import("../lib/api");
+                  const emailService = await import("../lib/emailService");
+
+                  // Send verification email
+                  await emailService.sendVerificationEmail(
+                    email,
+                    `Registration Confirmation for ${selectedEventForScanning.name}`,
+                    `https://example.com/verify/${selectedEventForScanning.id}/${studentId}`,
+                    selectedEventForScanning.name,
+                    `${selectedEventForScanning.id}-${studentId}`,
+                  );
+
+                  console.log(
+                    `Verification email sent to ${email} for event ${selectedEventForScanning.name}`,
+                  );
+                } catch (emailError) {
+                  console.error(
+                    "Error sending verification email:",
+                    emailError,
+                  );
+                }
+              } else {
+                alert(
+                  "Invalid student QR code format. Please scan a valid student QR code.",
+                );
+              }
+            }
           } catch (error) {
             console.error("Error processing QR code:", error);
             alert("Failed to process QR code. Please try again.");
           }
         }}
-        eventId="any"
-        eventName="Event Registration"
+        eventId={selectedEventForScanning?.id || "any"}
+        eventName={selectedEventForScanning?.name || "Event Registration"}
+        studentEmail={actualEmail}
       />
     </div>
   );
