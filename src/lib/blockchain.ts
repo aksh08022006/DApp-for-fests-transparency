@@ -214,6 +214,62 @@ export async function issueTicket(
 }
 
 /**
+ * Purchase a ticket directly with MetaMask
+ * @param eventId ID of the event
+ * @param studentId ID of the student
+ * @param eventName Name of the event
+ * @returns Result with ticket details or error
+ */
+export async function purchaseTicketWithMetaMask(
+  eventId: string,
+  studentId: string,
+  eventName: string,
+): Promise<{
+  success: boolean;
+  ticketId?: string;
+  transactionHash?: string;
+  error?: string;
+}> {
+  try {
+    // Connect to MetaMask
+    const walletAddress = await connectWallet();
+    if (!walletAddress) {
+      throw new Error("Failed to connect to MetaMask");
+    }
+
+    // Generate unique ticket ID
+    const ticketId = `ticket-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    // Create a message to sign for verification
+    const message = `Purchase ticket for ${eventName}\nEvent ID: ${eventId}\nTicket ID: ${ticketId}\nTimestamp: ${Date.now()}`;
+
+    // Sign the message
+    const signature = await signMessage(message, walletAddress);
+    if (!signature) {
+      throw new Error("Failed to sign transaction");
+    }
+
+    // Issue the ticket on blockchain
+    const result = await issueTicket(eventId, studentId, ticketId);
+    if (!result) {
+      throw new Error("Failed to issue ticket on blockchain");
+    }
+
+    return {
+      success: true,
+      ticketId,
+      transactionHash: result.transactionHash,
+    };
+  } catch (error) {
+    console.error("Error purchasing ticket with MetaMask:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+/**
  * Get consent status from the smart contract
  * @param requestId ID of the consent request
  * @returns Object containing verification status and student wallet address

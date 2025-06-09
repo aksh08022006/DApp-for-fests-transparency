@@ -36,6 +36,9 @@ interface HomeProps {
   isAuthenticated?: boolean;
 }
 
+// Generate a random student ID for demo purposes
+const generateStudentId = () => `S${Math.floor(10000 + Math.random() * 90000)}`;
+
 const Home = ({
   userRole: initialUserRole,
   userName: initialUserName = "John Doe",
@@ -58,6 +61,7 @@ const Home = ({
   const [studentEmail, setStudentEmail] = useState("");
   const [studentPassword, setStudentPassword] = useState("");
   const [walletConnecting, setWalletConnecting] = useState(false);
+  const [studentId, setStudentId] = useState(generateStudentId());
 
   // Reset error when login type changes
   useEffect(() => {
@@ -120,18 +124,19 @@ const Home = ({
 
       // Verify this is a student email (could check domain, etc.)
       if (email.endsWith("@college.edu") || email.includes("student")) {
+        // Generate a new student ID
+        const newStudentId = generateStudentId();
+
         // Store user info
         localStorage.setItem("studentName", name);
-        localStorage.setItem(
-          "studentId",
-          `S${Math.floor(10000 + Math.random() * 90000)}`,
-        );
+        localStorage.setItem("studentId", newStudentId);
         localStorage.setItem("studentEmail", email);
 
         setIsAuthenticated(true);
         setUserRole("student");
         setUserName(name);
         setUserEmail(email);
+        setStudentId(newStudentId);
       } else {
         setLoginError("This Google account is not registered as a student");
       }
@@ -394,8 +399,5 @@ const Home = ({
     </div>
   );
 };
-
-// Generate a random student ID for demo purposes
-const studentId = `S${Math.floor(10000 + Math.random() * 90000)}`;
 
 export default Home;

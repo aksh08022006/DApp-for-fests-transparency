@@ -890,6 +890,46 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({
               return false;
             }
           }}
+          onMetaMaskRegister={async () => {
+            try {
+              // Import blockchain module
+              const blockchain = await import("../lib/blockchain");
+
+              // Purchase ticket with MetaMask
+              const result = await blockchain.purchaseTicketWithMetaMask(
+                selectedEvent.id,
+                actualId,
+                selectedEvent.name,
+              );
+
+              if (result.success && result.ticketId && result.transactionHash) {
+                // Create new ticket object
+                const newTicket = {
+                  id: result.ticketId,
+                  eventId: selectedEvent.id,
+                  eventName: selectedEvent.name,
+                  date: selectedEvent.date,
+                  time: selectedEvent.time,
+                  location: selectedEvent.location,
+                  organizer: selectedEvent.organizer,
+                  status: "active" as const,
+                  qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${result.ticketId}`,
+                  transactionHash: result.transactionHash,
+                };
+
+                // In a real app, we would save this to the database
+                console.log("New MetaMask ticket created:", newTicket);
+
+                return true;
+              } else {
+                console.error("MetaMask ticket purchase failed:", result.error);
+                return false;
+              }
+            } catch (error) {
+              console.error("Error purchasing ticket with MetaMask:", error);
+              return false;
+            }
+          }}
         />
       )}
 
